@@ -41,7 +41,8 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // Check if this is the first user (make them admin)
-    const [existingUser] = await db.select().from(users).where(eq(users.id, userData.id));
+    // *** تم تصحيح الخطأ هنا بإضافة علامة ! ***
+    const [existingUser] = await db.select().from(users).where(eq(users.id, userData.id!));
     
     if (existingUser) {
       // Update existing user (don't change isAdmin status)
@@ -51,7 +52,8 @@ export class DatabaseStorage implements IStorage {
           ...userData,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userData.id))
+        // *** وتم تصحيح الخطأ هنا بإضافة علامة ! ***
+        .where(eq(users.id, userData.id!))
         .returning();
       return user;
     }
