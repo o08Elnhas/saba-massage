@@ -1,0 +1,248 @@
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+console.log('🚀 جاري إعداد مشروع "سبأ للمساج" ليعمل على Replit...');
+
+const files = {
+  // ================= ملفات الإعداد الخاصة بـ REPLIT =================
+  '.replit': `
+run = "npm start"
+entrypoint = "backend/server.js"
+modules = ["nodejs-18"]
+  `,
+
+  'package.json': JSON.stringify({
+    "name": "saba-massage-replit",
+    "version": "1.0.0",
+    "scripts": {
+      "postinstall": "cd frontend && npm install && npm run build && cd ../backend && npm install",
+      "start": "node backend/server.js"
+    }
+  }, null, 2),
+
+  // ================= BACKEND (معدل ليخدم الموقع) =================
+  'backend/package.json': JSON.stringify({
+    "name": "backend",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "server.js",
+    "dependencies": { "express": "^4.18.2", "cors": "^2.8.5", "mongoose": "^7.0.3", "dotenv": "^16.0.0" }
+  }, null, 2),
+
+  'backend/server.js': `
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// إعداد المسارات
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// 1. تقديم ملفات الموقع الثابتة (بعد البناء)
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// 2. قاعدة البيانات (وهمية للسرعة أو حقيقية إذا أضفت الرابط)
+// يمكنك إضافة رابط مونجو الحقيقي في تبويب Secrets في Replit
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/test'; 
+mongoose.connect(MONGO_URI).then(()=>console.log('DB OK')).catch(e=>console.log('DB Note: Using Local or Error'));
+
+// 3. API العروض (من المنشور)
+app.get('/api/offers', (req, res) => {
+  res.json({
+    offers: [
+      {_id:1, title:'💎 جلسة تجريبية أولى', description:'للعملاء الجدد فقط', price:'سعر', discountPrice:199, badge:'الأكثر طلباً'},
+      {_id:2, title:'👑 باقة 4 جلسات', description:'برنامج علاجي متكامل', price:'خصم', discountPrice:'25%', badge:'توفير'},
+      {_id:3, title:'🎊 باقة 8 جلسات', description:'استعادة كاملة للنشاط + هدية', price:'خصم', discountPrice:'40%', badge:'VIP'}
+    ]
+  });
+});
+
+// 4. توجيه أي رابط آخر للصفحة الرئيسية (لجعل React Router يعمل)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
+
+const PORT = 3000; // Replit يفضل هذا المنفذ
+app.listen(PORT, () => console.log(\`Server running on port \${PORT}\`));
+  `,
+
+  // ================= FRONTEND =================
+  'frontend/package.json': JSON.stringify({
+    "name": "frontend",
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": { "build": "vite build" },
+    "dependencies": { "react": "^18.2.0", "react-dom": "^18.2.0", "react-router-dom": "^6.8.0", "axios": "^1.3.0", "leaflet": "^1.9.4", "react-leaflet": "^4.2.1" },
+    "devDependencies": { "@vitejs/plugin-react": "^4.0.0", "vite": "^4.2.0" }
+  }, null, 2),
+
+  'frontend/vite.config.js': `
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+export default defineConfig({ plugins: [react()] });
+  `,
+
+  'frontend/index.html': `
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مركز سبأ للمساج</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  </head>
+  <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
+</html>
+  `,
+
+  'frontend/src/main.jsx': `
+import React from 'react'; import ReactDOM from 'react-dom/client'; import App from './App.jsx'; import './index.css';
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  `,
+
+  'frontend/src/index.css': `
+body { margin: 0; font-family: Tahoma, sans-serif; background: #f4f4f4; }
+.container { max-width: 600px; margin: 0 auto; background: white; min-height: 100vh; }
+.hero { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 20px; text-align: center; }
+.card { background: white; border: 1px solid #eee; border-radius: 8px; padding: 15px; margin: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.btn { width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-size: 16px; }
+.map-box { height: 200px; margin: 10px 0; border: 2px solid #eee; }
+  `,
+
+  'frontend/src/App.jsx': `
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Booking from './pages/Booking';
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="container">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/book/:id" element={<Booking />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+  `,
+
+  'frontend/src/pages/Home.jsx': `
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import axios from 'axios';
+
+export default function Home() {
+  const [offers, setOffers] = useState([]);
+
+  useEffect(() => {
+    // في Replit نطلب الرابط النسبي مباشرة
+    axios.get('/api/offers').then(res => setOffers(res.data.offers));
+  }, []);
+
+  return (
+    <div>
+      <div className="hero">
+        <h2>🌿 مركز سبأ للمساج</h2>
+        <p>لأن صحتك تستحق الأفضل.. نعيد شحن طاقتك ⚡</p>
+      </div>
+      <div style={{padding:'10px'}}>
+        <h3 style={{paddingRight:'10px', borderRight:'4px solid #27ae60'}}>🔥 عروض حصرية</h3>
+        {offers.map(o => (
+          <div key={o._id} className="card">
+            {o.badge && <span style={{background:'#e74c3c', color:'white', padding:'2px 8px', borderRadius:'4px', fontSize:'12px'}}>{o.badge}</span>}
+            <h4>{o.title}</h4>
+            <p style={{color:'#666'}}>{o.description}</p>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <span style={{textDecoration:'line-through', color:'#999'}}>{o.price}</span>
+              <span style={{color:'#27ae60', fontWeight:'bold', fontSize:'1.2em'}}>{o.discountPrice} ريال</span>
+            </div>
+            <Link to={\`/book/\${o._id}\`}><button className="btn">احجز الآن 📲</button></Link>
+          </div>
+        ))}
+        
+        <div className="card" style={{textAlign:'center', background:'#f9f9f9'}}>
+          <h4>📍 تواصل معنا</h4>
+          <p>جدة - حي السلامة - شارع الملك فهد</p>
+          <a href="https://facebook.com/SabaSpaCenter" target="_blank" style={{color:'#1877f2'}}>صفحتنا على فيسبوك</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+  `,
+
+  'frontend/src/pages/Booking.jsx': `
+import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+
+function LocationMarker({ setPos }) {
+  useMapEvents({ click(e) { setPos(e.latlng); } });
+  return null;
+}
+
+export default function Booking() {
+  const { id } = useParams();
+  const [pos, setPos] = useState(null);
+  const [form, setForm] = useState({name:'', phone:'', notes:''});
+
+  const send = (e) => {
+    e.preventDefault();
+    const loc = pos ? \`http://maps.google.com/?q=\${pos.lat},\${pos.lng}\` : 'غير محدد';
+    const msg = \`*حجز جديد - سبأ* %0a👤 الاسم: \${form.name}%0a📞 الجوال: \${form.phone}%0a🎫 عرض رقم: \${id}%0a📍 الموقع: \${loc}%0a📝 \${form.notes}\`;
+    window.open(\`https://wa.me/966508265296?text=\${msg}\`, '_blank');
+  };
+
+  return (
+    <div>
+      <div className="hero" style={{padding:'10px'}}><h3>📝 إكمال الحجز</h3></div>
+      <form onSubmit={send} style={{padding:'15px'}}>
+        <label>الاسم:</label>
+        <input required style={{width:'100%', padding:'8px', marginBottom:'10px'}} onChange={e=>setForm({...form, name:e.target.value})} />
+        
+        <label>الجوال (واتساب):</label>
+        <input required type="tel" style={{width:'100%', padding:'8px', marginBottom:'10px'}} onChange={e=>setForm({...form, phone:e.target.value})} />
+
+        <label>📍 حدد موقعك:</label>
+        <div className="map-box">
+          <MapContainer center={[21.54, 39.17]} zoom={12} style={{height:'100%'}}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <LocationMarker setPos={setPos} />
+            {pos && <Marker position={pos} />}
+          </MapContainer>
+        </div>
+        
+        <button className="btn">إرسال للواتساب </button>
+      </form>
+    </div>
+  );
+}
+  `
+};
+
+// إنشاء الملفات
+Object.entries(files).forEach(([f, c]) => {
+  const p = path.join(__dirname, f);
+  if (!fs.existsSync(path.dirname(p))) fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, c.trim());
+  console.log(`✅ Created: ${f}`);
+});
+
+console.log('\n⏳ جاري تثبيت المكاتب (قد يستغرق دقيقة)...');
+try {
+  // أمر سحري لتثبيت كل شيء وبناء الموقع مرة واحدة
+  execSync('npm install && cd frontend && npm install && npm run build && cd ../backend && npm install', { stdio: 'inherit' });
+  console.log('\n🎉 تم التثبيت! اضغط زر RUN الأخضر في الأعلى لتشغيل الموقع.');
+} catch (e) {
+  console.error('⚠️ حدث خطأ أثناء التثبيت، حاول كتابة "npm install" يدوياً في الـ Shell.');
+}
